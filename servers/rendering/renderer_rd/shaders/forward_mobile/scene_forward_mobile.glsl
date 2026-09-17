@@ -285,6 +285,11 @@ void vertex_shader(in vec3 vertex,
 			in_inv_view_matrix[1],
 			in_inv_view_matrix[2],
 			vec4(0.0, 0.0, 0.0, 1.0)));
+#ifdef USE_DOUBLE_PRECISION
+	vec3 camera_position_world = -(inv_view_matrix[3].xyz + view_precision);
+#else
+	vec3 camera_position_world = inv_view_matrix[3].xyz;
+#endif
 
 	mat4 model_matrix = transpose(mat4(in_model_matrix[0],
 			in_model_matrix[1],
@@ -1203,6 +1208,11 @@ void main() {
 			scene_data.inv_view_matrix[1],
 			scene_data.inv_view_matrix[2],
 			vec4(0.0, 0.0, 0.0, 1.0)));
+#ifdef USE_DOUBLE_PRECISION
+	vec3 camera_position_world = -(inv_view_matrix[3].xyz + scene_data.inv_view_precision.xyz);
+#else
+	vec3 camera_position_world = inv_view_matrix[3].xyz;
+#endif
 	mat4 read_model_matrix = transpose(mat4(instances.data[draw_call.instance_index].transform[0],
 			instances.data[draw_call.instance_index].transform[1],
 			instances.data[draw_call.instance_index].transform[2],

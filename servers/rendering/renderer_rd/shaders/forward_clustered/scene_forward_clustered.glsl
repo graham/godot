@@ -249,6 +249,9 @@ void vertex_shader(vec3 vertex_input,
 
 #ifdef USE_DOUBLE_PRECISION
 	vec3 view_precision = scene_data.inv_view_precision.xyz;
+	vec3 camera_position_world = -(inv_view_matrix[3].xyz + view_precision);
+#else
+	vec3 camera_position_world = inv_view_matrix[3].xyz;
 #endif
 
 	mat3 model_normal_matrix;
@@ -1275,6 +1278,11 @@ void fragment_shader(in SceneData scene_data) {
 			scene_data.inv_view_matrix[1],
 			scene_data.inv_view_matrix[2],
 			vec4(0.0, 0.0, 0.0, 1.0)));
+#ifdef USE_DOUBLE_PRECISION
+	vec3 camera_position_world = -(inv_view_matrix[3].xyz + scene_data.inv_view_precision.xyz);
+#else
+	vec3 camera_position_world = inv_view_matrix[3].xyz;
+#endif
 	mat4 read_model_matrix = transpose(mat4(instances.data[instance_index].transform[0],
 			instances.data[instance_index].transform[1],
 			instances.data[instance_index].transform[2],

@@ -958,11 +958,28 @@ Error OS_Unix::create_process(const String &p_path, const List<String> &p_argume
 }
 
 Error OS_Unix::kill(const ProcessID &p_pid) {
+	{
+		MutexLock lock(process_map_mutex);
+		const ProcessInfo *pi = process_map->getptr(p_pid);
+		if (pi && !pi->is_running) {
+			// Already reaped: the pid may since have been reused by an unrelated process.
+			return ERR_INVALID_PARAMETER;
+		}
+	}
+
 	int ret = ::kill(p_pid, SIGKILL);
 	if (!ret) {
-		//avoid zombie process
-		int st;
-		_wait_for_pid_completion(p_pid, &st, 0);
+		// Avoid a zombie process, and remember that it has exited: once reaped, waitpid()
+		// on this pid fails with ECHILD, so is_process_running() must not ask again.
+		int st = 0;
+		if (_wait_for_pid_completion(p_pid, &st, 0) == 0) {
+			MutexLock lock(process_map_mutex);
+			const ProcessInfo *pi = process_map->getptr(p_pid);
+			if (pi) {
+				pi->is_running = false;
+				pi->exit_code = WIFEXITED(st) ? WEXITSTATUS(st) : st;
+			}
+		}
 	}
 	return ret ? ERR_INVALID_PARAMETER : OK;
 }

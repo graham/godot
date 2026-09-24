@@ -377,19 +377,29 @@ Error ENetMultiplayerPeer::put_packet(const uint8_t *p_buffer, int p_buffer_size
 			// Send to all but one and make copies for sending.
 			int exclude = -target_peer;
 			for (KeyValue<int, Ref<ENetPacketPeer>> &E : peers) {
-				if (E.key == exclude) {
+				if (E.key == exclude || !_can_send_to(E.value)) {
 					continue;
 				}
 				E.value->send(channel, packet);
 			}
 			_destroy_unused(packet);
 		} else {
+			if (!_can_send_to(peers[target_peer])) {
+				// Already disconnected; poll() will report it.
+				_destroy_unused(packet);
+				return ERR_UNAVAILABLE;
+			}
 			peers[target_peer]->send(channel, packet);
 		}
 		ERR_FAIL_COND_V(!hosts.has(0), ERR_BUG);
 		hosts[0]->flush();
 
 	} else if (active_mode == MODE_CLIENT) {
+		if (!_can_send_to(peers[1])) {
+			// Already disconnected; poll() will report it.
+			_destroy_unused(packet);
+			return ERR_UNAVAILABLE;
+		}
 		peers[1]->send(channel, packet); // Send to server for broadcast.
 		ERR_FAIL_COND_V(!hosts.has(0), ERR_BUG);
 		hosts[0]->flush();
@@ -398,7 +408,7 @@ Error ENetMultiplayerPeer::put_packet(const uint8_t *p_buffer, int p_buffer_size
 		if (target_peer <= 0) {
 			int exclude = Math::abs(target_peer);
 			for (KeyValue<int, Ref<ENetPacketPeer>> &E : peers) {
-				if (E.key == exclude) {
+				if (E.key == exclude || !_can_send_to(E.value)) {
 					continue;
 				}
 				E.value->send(channel, packet);
@@ -407,6 +417,11 @@ Error ENetMultiplayerPeer::put_packet(const uint8_t *p_buffer, int p_buffer_size
 			}
 			_destroy_unused(packet);
 		} else {
+			if (!_can_send_to(peers[target_peer])) {
+				// Already disconnected; poll() will report it.
+				_destroy_unused(packet);
+				return ERR_UNAVAILABLE;
+			}
 			peers[target_peer]->send(channel, packet);
 			ERR_FAIL_COND_V(!hosts.has(target_peer), ERR_BUG);
 			hosts[target_peer]->flush();
@@ -467,6 +482,20 @@ void ENetMultiplayerPeer::_destroy_unused(ENetPacket *p_packet) {
 	if (p_packet->referenceCount == 0) {
 		enet_packet_destroy(p_packet);
 	}
+}
+
+// Whether ENet will still take a packet for this peer. Once ENet has processed a peer's
+// disconnection (or our own request to disconnect it), it frees the peer's channels,
+// but the peer stays in `peers` until poll() delivers the disconnect event. Several
+// peers can leave in the same service call, and while the first one's
+// peer_disconnected is being emitted (SceneMultiplayer relays it to every other peer)
+// the others are still listed with no channels left to send on.
+bool ENetMultiplayerPeer::_can_send_to(const Ref<ENetPacketPeer> &p_peer) {
+	if (p_peer.is_null() || !p_peer->is_active()) {
+		return false;
+	}
+	const ENetPacketPeer::PeerState state = p_peer->get_state();
+	return state == ENetPacketPeer::STATE_CONNECTED || state == ENetPacketPeer::STATE_DISCONNECT_LATER;
 }
 
 void ENetMultiplayerPeer::_bind_methods() {

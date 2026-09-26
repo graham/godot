@@ -141,6 +141,14 @@ private:
 
 	bool pending_update = false;
 
+	// Whether the mesh has been built, and the window it was built in. Re-entering the tree rebuilds it only when it
+	// was never built or the window changed; nothing else that shapes it can change while it is out of the tree.
+	bool mesh_built = false;
+	ObjectID built_window;
+	// The language the text was last shaped in, so that a TRANSLATION_CHANGED that changes neither the translated text
+	// nor the language (every node gets one on entering the tree) does not reshape it.
+	String shaped_language;
+
 	bool dirty_lines = true;
 	bool dirty_font = true;
 	bool dirty_text = true;

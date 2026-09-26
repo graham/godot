@@ -204,11 +204,13 @@ void Label3D::_validate_property(PropertyInfo &p_property) const {
 void Label3D::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
-			if (!pending_update) {
-				_im_update();
-			}
 			Window *window = get_window();
 			ERR_FAIL_NULL(window);
+			// A label moved from one parent to another keeps its mesh: rebuilding it here cleared the mesh, freed and
+			// recreated its materials and uploaded every surface again for text that had not changed.
+			if (!pending_update && (!mesh_built || built_window != window->get_instance_id())) {
+				_im_update();
+			}
 			window->connect("size_changed", callable_mp(this, &Label3D::_font_changed));
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
@@ -217,8 +219,14 @@ void Label3D::_notification(int p_what) {
 			window->disconnect("size_changed", callable_mp(this, &Label3D::_font_changed));
 		} break;
 		case NOTIFICATION_TRANSLATION_CHANGED: {
-			// Language update might change the appearance of some characters.
-			xl_text = atr(text);
+			// Every node is sent this on entering the tree. Reshape only if the translated text or the language it is
+			// shaped in has changed; a language update might change the appearance of some characters.
+			const String new_text = atr(text);
+			const String new_language = language.is_empty() ? _get_locale() : language;
+			if (new_text == xl_text && new_language == shaped_language && mesh_built) {
+				break;
+			}
+			xl_text = new_text;
 			dirty_text = true;
 			_queue_update();
 		} break;
@@ -227,6 +235,9 @@ void Label3D::_notification(int p_what) {
 
 void Label3D::_im_update() {
 	_shape();
+	mesh_built = true;
+	Window *window = is_inside_tree() ? get_window() : nullptr;
+	built_window = window ? window->get_instance_id() : ObjectID();
 
 	triangle_mesh.unref();
 	update_gizmos();
@@ -483,6 +494,7 @@ void Label3D::_shape() {
 		TS->shaped_text_set_direction(text_rid, text_direction);
 
 		const String &lang = language.is_empty() ? _get_locale() : language;
+		shaped_language = lang;
 		String txt = uppercase ? TS->string_to_upper(xl_text, lang) : xl_text;
 		TS->shaped_text_add_string(text_rid, txt, font->get_rids(), font_size, font->get_opentype_features(), lang);
 

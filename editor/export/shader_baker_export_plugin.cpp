@@ -323,6 +323,10 @@ Node *ShaderBakerExportPlugin::_customize_scene(Node *p_root, const String &p_pa
 			List<PropertyInfo> property_list;
 			node->get_property_list(&property_list);
 			for (const PropertyInfo &info : property_list) {
+				// Only material options are needed; global transforms are invalid off-tree.
+				if (!properties.has(info.name)) {
+					continue;
+				}
 				bool valid = false;
 				Variant property = node->get(info.name, &valid);
 				if (valid) {

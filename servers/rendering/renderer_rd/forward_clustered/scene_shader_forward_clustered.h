@@ -41,6 +41,8 @@ class SceneShaderForwardClustered {
 private:
 	static SceneShaderForwardClustered *singleton;
 	static Mutex singleton_mutex;
+	// Guards `compiler` alone. The draw never takes it, so a shader compiling on any thread does not hold up a draw.
+	static Mutex compiler_mutex;
 
 public:
 	enum ShaderGroup {

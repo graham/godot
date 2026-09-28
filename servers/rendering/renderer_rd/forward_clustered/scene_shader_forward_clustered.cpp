@@ -173,7 +173,7 @@ void SceneShaderForwardClustered::ShaderData::set_code(const String &p_code) {
 
 	Error err = OK;
 	{
-		MutexLock lock(SceneShaderForwardClustered::singleton_mutex);
+		MutexLock lock(SceneShaderForwardClustered::compiler_mutex);
 		err = SceneShaderForwardClustered::singleton->compiler.compile(RSE::SHADER_SPATIAL, code, &actions, path, gen_code);
 	}
 
@@ -615,6 +615,7 @@ RendererRD::MaterialStorage::MaterialData *SceneShaderForwardClustered::_create_
 
 SceneShaderForwardClustered *SceneShaderForwardClustered::singleton = nullptr;
 Mutex SceneShaderForwardClustered::singleton_mutex;
+Mutex SceneShaderForwardClustered::compiler_mutex;
 
 SceneShaderForwardClustered::SceneShaderForwardClustered() {
 	// there should be only one of these, contained within our RenderFM singleton.

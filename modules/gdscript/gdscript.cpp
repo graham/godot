@@ -389,6 +389,10 @@ MethodInfo GDScript::get_method_info(const StringName &p_method) const {
 
 bool GDScript::get_property_default_value(const StringName &p_property, Variant &r_value) const {
 #ifdef TOOLS_ENABLED
+	if (source_changed_cache && !Engine::get_singleton()->is_editor_hint()) {
+		// Outside the editor, reload() leaves this cache to be filled on first use (see there).
+		const_cast<GDScript *>(this)->_update_exports(nullptr, false, nullptr);
+	}
 
 	HashMap<StringName, Variant>::ConstIterator E = member_default_values_cache.find(p_property);
 	if (E) {
@@ -891,8 +895,9 @@ Error GDScript::reload(bool p_keep_state) {
 		_restore_old_static_data();
 	}
 
-	if (p_keep_state) {
-		// Update the properties in the inspector.
+	// Update the properties in the inspector. This parses and analyzes the source a second time, so outside the
+	// editor, where no inspector shows them, it is left to get_property_default_value() to do on first use.
+	if (p_keep_state && (Engine::get_singleton()->is_editor_hint() || !placeholders.is_empty() || !inheriters_cache.is_empty())) {
 		update_exports();
 	}
 #endif
